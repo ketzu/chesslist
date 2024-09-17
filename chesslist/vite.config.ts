@@ -8,6 +8,7 @@ export default defineConfig({
   plugins: [
     vue(),
   ],
+  base: "https://ketzu.github.io/chesslist/",
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
