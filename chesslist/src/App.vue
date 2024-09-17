@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import ChessBoard from './components/ChessBoard.vue';
+import FENView from './views/FENView.vue'
 </script>
 
 <template>
-  <ChessBoard />
+  <FENView />
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

@@ -5,23 +5,18 @@ import 'vue3-chessboard/style.css'
 import { Chess, type Move } from 'chess.js'
 import { ref } from 'vue'
 
-const urlParams = new URLSearchParams(window.location.search)
-console.log(`Loading ${urlParams.get('fen')}`)
+const emit = defineEmits(['move', 'finished', 'mistake'])
+const props = defineProps(['fen', 'perspective'])
 
 type MadeMove = Move & {
   done: boolean
 }
-
 const config: { api?: BoardApi } = {}
 
-// randomly choose a perspective
-// const perspective = Math.random() > 0.5 ? 'white' : 'black'
-const fen = urlParams.get('fen') as string
-if (fen === null) {
-  throw new Error('No FEN provided')
-}
+const fen = props.fen
+const perspective = props.perspective
+
 const game = new Chess(fen)
-const perspective = game.turn() === 'w' ? 'white' : 'black'
 
 const moves = ref<{ checks: MadeMove[]; captures: MadeMove[]; all: MadeMove[] }>({
   checks: [],
@@ -34,33 +29,41 @@ game
     verbose: true
   })
   .forEach((move) => {
-    if (move.color !== perspective[0]) return
+    if (move.color !== game.turn()) return
     const mademove = { ...move, done: false }
-    moves.value.all.push(mademove)
-    if (move.captured !== undefined) {
-      moves.value.captures.push(mademove)
-    }
-    if (game.move(move)) {
-      if (game.isCheck()) {
-        moves.value.checks.push(mademove)
-      }
-      game.undo()
+    const capture = move.captured !== undefined
+
+    const check = game.move(move) && game.isCheck()
+    game.undo()
+
+    if (capture) moves.value.captures.push(mademove)
+    if (check) moves.value.checks.push(mademove)
+    if (check || capture) {
+      moves.value.all.push(mademove)
     }
   })
 
-console.log(moves.value)
-
 const boardConfig: BoardConfig = {
   events: {
-    move: (from, to, _capture) => {
+    move: (from, to) => {
       const move = moves.value.all.find((m) => m.from === from && m.to === to)
+      emit('move', from, to)
       if (move !== undefined) {
         move.done = true
+      } else {
+        emit('mistake')
+      }
+
+      console.log(moves.value.all.every((m) => m.done))
+      console.log(moves.value.all)
+
+      if (moves.value.all.every((m) => m.done)) {
+        emit('finished')
       }
 
       setTimeout(() => {
         config.api?.undoLastMove()
-      }, 1000)
+      }, 250)
     }
   },
   fen,
@@ -72,6 +75,7 @@ function setAPI(api: BoardApi) {
   config.api = api
 }
 </script>
+
 <template>
   <div class="container">
     <div>
@@ -79,7 +83,7 @@ function setAPI(api: BoardApi) {
     </div>
     <div class="info">
       <h1>Chesslist</h1>
-      <h2>Playing {{ perspective }}</h2>
+      <h2>Playing {{ game.turn() ? 'White' : 'Black' }}</h2>
       <h2>Checks ({{ moves.checks.filter((m) => m.done).length }}/{{ moves.checks.length }})</h2>
       <ul>
         <li v-for="move in moves.checks.filter((m) => m.done)" :key="move.after">
@@ -94,6 +98,7 @@ function setAPI(api: BoardApi) {
           {{ move.san }} {{ move.captured }}
         </li>
       </ul>
+      <button @click="emit('finished')">Give Up</button>
     </div>
   </div>
 </template>
